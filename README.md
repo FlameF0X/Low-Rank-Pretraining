@@ -40,10 +40,10 @@ LoRPt is a core component of the **i3 architecture** - a proprietary next-genera
 
 ### Real-World Results
 
-| Model Size | Training Time | VRAM Usage | Hardware |
-|------------|---------------|------------|----------|
-| **200M params** | < 4 hours | < 9 GB | T4 / P100 GPU |
-| **10-12M params** | - | 4-6 GB | T4 / P100 GPU |
+| Model Size        | Training Time | VRAM Usage | Hardware      |
+| ----------------- | ------------- | ---------- | ------------- |
+| **200M params**   | < 4 hours     | < 9 GB     | T4 / P100 GPU |
+| **10-12M params** | -             | 4-6 GB     | T4 / P100 GPU |
 
 *Note: These metrics include the full i3 architecture with LoRPt components*
 
@@ -52,34 +52,94 @@ LoRPt is a core component of the **i3 architecture** - a proprietary next-genera
 ## LoRPt vs Normal Linear Layer - Benchmark Results
 
 **Test Environment:**
-- GPU: Tesla P100-PCIE-16GB
-- CUDA: 12.4
-- PyTorch: 2.6.0+cu124
+
+* GPU: Tesla P100-PCIE-16GB
+* CUDA: 12.4
+* PyTorch: 2.6.0+cu124
+
+### Configuration: Training Quality Benchmark
+
+**Benchmark Description:**
+This benchmark trains both a normal linear model and a LoRPt model on a synthetic dataset and compares their loss convergence.
+
+**Model & Training Parameters:**
+
+* Device: cuda
+* Vocabulary Size: 1000
+* Model Dimension: 256
+* Number of Layers: 4
+* LoRPt Rank: 64
+* Training Iterations: 2000
+* Batch Size: 32
+* Learning Rate: 0.0003
+
+**Dataset:**
+
+* Training samples: 10,000
+* Test samples: 1,000
+
+### Training Logs Snapshot
+
+**Normal Linear Model:**
+
+```
+Final Train Loss: 6.1186 | Test Loss: 6.3234 | Perplexity: 557.44 | Total Time: 16.3s
+```
+
+**LoRPt Model:**
+
+```
+Final Train Loss: 6.2195 | Test Loss: 6.2279 | Perplexity: 506.71 | Total Time: 16.5s
+Parameter Reduction: 61.4%
+```
+
+### Comparison
+
+| Metric          | Normal Linear | LoRPt     | Difference |
+| --------------- | ------------- | --------- | ---------- |
+| Test Loss       | 6.3234        | 6.2279    | -1.51%     |
+| Perplexity      | 557.44        | 506.71    | -9.10%     |
+| Training Time   | 16.3s         | 16.5s     | +1.08%     |
+| Parameter Count | 2,634,216     | 1,016,808 | -61.4%     |
+
+**Verdict:**
+✅ **Equivalent Quality** — LoRPt achieves comparable model quality to Normal Linear
+
+* 1.5% lower test loss
+* 9.1% better perplexity
+* 61.4% fewer parameters
+* Training time slightly slower (+1.1%), negligible impact
+
+<img width="1489" height="490" alt="image" src="https://github.com/user-attachments/assets/472c91a3-94ef-4fa5-bb4a-e9bfbbbb256c" />
+
+---
 
 ### Configuration 1: Small Model
 
 **Model Architecture:**
-- Embedding Dimension: 512
-- Feed-Forward Dimension: 2048
-- Number of Layers: 4
-- LoRPt Rank: 64
-- Batch Size: 16
-- Sequence Length: 128
+
+* Embedding Dimension: 512
+* Feed-Forward Dimension: 2048
+* Number of Layers: 4
+* LoRPt Rank: 64
+* Batch Size: 16
+* Sequence Length: 128
 
 #### Results
 
-| Metric | Normal Linear | LoRPt | Improvement |
-|--------|---------------|-------|-------------|
-| **Parameters** | 8,911,848 | 1,418,728 | **84.1% reduction** |
-| **Memory (MB)** | 34.00 | 5.41 | **84.1% reduction** |
-| **Forward Pass (ms)** | 6.02 ± 0.19 | 6.21 ± 0.08 | 0.97x (6% slower) |
-| **Training Step (ms)** | 17.08 ± 0.10 | 18.13 ± 0.12 | 0.94x (6% slower) |
+| Metric                 | Normal Linear | LoRPt        | Improvement         |
+| ---------------------- | ------------- | ------------ | ------------------- |
+| **Parameters**         | 8,911,848     | 1,418,728    | **84.1% reduction** |
+| **Memory (MB)**        | 34.00         | 5.41         | **84.1% reduction** |
+| **Forward Pass (ms)**  | 6.02 ± 0.19   | 6.21 ± 0.08  | 0.97x (6% slower)   |
+| **Training Step (ms)** | 17.08 ± 0.10  | 18.13 ± 0.12 | 0.94x (6% slower)   |
 
 **Summary:**
-- ✅ 84.1% fewer parameters
-- ✅ 84.1% less memory usage
-- ⚠️ 6% slower inference
-- ⚠️ 6% slower training per step
+
+* ✅ 84.1% fewer parameters
+* ✅ 84.1% less memory usage
+* ⚠️ 6% slower inference
+* ⚠️ 6% slower training per step
 
 ### Configuration 2: Medium Model
 

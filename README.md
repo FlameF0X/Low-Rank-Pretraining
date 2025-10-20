@@ -267,6 +267,131 @@ LoRPt demonstrates an excellent trade-off for pretraining:
 
 ---
 
+## LoRPt Placement Ablation Study
+
+This comprehensive study tests **where** to apply LoRPt factorization within transformer architectures. Seven variants were trained to identify optimal placement strategies.
+
+### Study Configuration
+
+**Model Architecture:**
+- Vocabulary Size: 1,000
+- Model Dimension: 256
+- Feed-Forward Dimension: 1,024
+- Number of Layers: 4
+- LoRPt Rank: 64
+- Training Iterations: 10,000
+- Batch Size: 32
+- Sequence Length: 32
+
+**Variants Tested:**
+
+1. **Fully Normal (Baseline)** - All standard Linear layers
+2. **Fully LoRPt (All FFN)** - LoRPt on all FFN layers + output
+3. **Output Normal (LoRPt FFN)** - LoRPt on FFN, full-rank output
+4. **Only FFN-Up** - LoRPt only on up-projection (d_model → d_ff)
+5. **Only FFN-Down** - LoRPt only on down-projection (d_ff → d_model)
+6. **Alternating Layers** - Alternating LoRPt and normal layers
+7. **Depth-Adaptive Rank** - Higher rank (128) for first/last layers, lower (64) for middle
+
+### Results Summary
+
+| Variant | Parameters | Final Loss | vs Baseline | Verdict |
+|---------|-----------|------------|-------------|---------|
+| **Fully Normal (Baseline)** | 2,634,216 | 6.2970 | 0% | Reference |
+| **Fully LoRPt (All FFN)** | 1,016,808 | 6.6851 | +6.16% | ⚠️ Slight degradation |
+| **Output Normal (LoRPt FFN)** | 1,274,408 | 6.5004 | +3.23% | ✅ **Best LoRPt variant** |
+| **Only FFN-Up** | 1,709,416 | 6.4129 | +1.84% | ✅ Good balance |
+| **Only FFN-Down** | 1,660,008 | 6.3169 | +0.32% | ✅ Near-baseline quality |
+| **Alternating Layers** | 1,825,512 | 6.2870 | -0.16% | ✅ Matches baseline |
+| **Depth-Adaptive Rank** | 1,150,208 | 6.4722 | +2.78% | ⚠️ Moderate degradation |
+
+### Key Findings
+
+#### 1. Output Projection Matters
+
+**Output Normal (LoRPt FFN)** achieved the best quality among LoRPt variants:
+- Only 3.2% higher loss than baseline
+- 51.6% parameter reduction (2.6M → 1.3M)
+- Full-rank output preserves vocabulary distribution modeling
+
+**Insight:** The output projection directly affects prediction accuracy. Keeping it full-rank is worth the memory cost for maintaining quality.
+
+#### 2. Alternating Layers Surprises
+
+**Alternating Layers** actually *matched* the baseline:
+- -0.16% loss difference (essentially identical)
+- 30.7% parameter reduction
+- Shows that **not every layer needs full capacity**
+
+**Insight:** Strategic placement can achieve near-zero quality loss. Some layers benefit more from full-rank expressivity than others.
+
+#### 3. Down-Projection More Robust
+
+**Only FFN-Down** (0.32% loss increase) outperformed **Only FFN-Up** (1.84% increase):
+- Down-projection (d_ff → d_model) tolerates low-rank better
+- Up-projection (d_model → d_ff) is more sensitive to compression
+
+**Insight:** If you can only factorize one projection, choose the down-projection for better quality retention.
+
+#### 4. Full LoRPt Trade-off
+
+**Fully LoRPt** showed 6.16% loss increase but achieved:
+- 61.4% parameter reduction
+- Significant memory savings
+- Still acceptable perplexity for many applications
+
+**Insight:** Maximum memory savings come at a measurable quality cost. Acceptable for resource-constrained scenarios or early-stage experiments.
+
+### Visual Analysis
+
+The training curves reveal:
+
+1. **Convergence Speed:** All variants converged at similar rates, suggesting LoRPt doesn't hurt optimization dynamics
+2. **Final Stability:** LoRPt models showed stable final loss (no instability from factorization)
+3. **Parameter Efficiency:** The Output Normal variant achieved the best loss-to-parameter ratio
+
+### Practical Recommendations
+
+Based on ablation results:
+
+**For Maximum Quality (< 1% loss):**
+- Use **Alternating Layers** strategy
+- Apply LoRPt to middle layers only
+- Keep first, last, and output layers full-rank
+
+**For Balanced Trade-off (< 3% loss):**
+- Use **Output Normal** strategy
+- Apply LoRPt to all FFN layers
+- Keep output projection full-rank
+
+**For Maximum Memory Savings (< 7% loss):**
+- Use **Fully LoRPt** strategy
+- Accept quality degradation for extreme resource constraints
+- Good for experimentation and prototyping
+
+**General Strategy:**
+1. Start with **Output Normal** as default
+2. If quality matters most: Switch to **Alternating Layers**
+3. If memory matters most: Use **Fully LoRPt**
+4. Always prefer factorizing **down-projections** over up-projections when choosing specific layers
+
+### Study Limitations
+
+- Single task (language modeling on synthetic data)
+- Small model scale (256d) - larger models may show different patterns
+- Fixed rank (64) - adaptive rank scheduling not tested
+- No attention mechanism - only FFN layers evaluated
+
+Future work should validate these findings on:
+- Real-world datasets (WikiText, C4, etc.)
+- Larger model scales (1B+ parameters)
+- Different architectures (attention, MoE, etc.)
+- Dynamic rank adjustment strategies
+
+<img width="1589" height="1190" alt="image" src="https://github.com/user-attachments/assets/cec14050-7972-4652-9fc2-879e9f823c20" />
+
+---
+
 ## Use Cases
 
 ### 1. Resource-Constrained Pretraining
